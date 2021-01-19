@@ -10,4 +10,6 @@ bool initCUDA();
 
 bool calculateSumOfSquares();
 
+bool calculateMatrixMultiply();
+
 

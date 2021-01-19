@@ -12,6 +12,7 @@
 #define DATA_SIZE 1048576
 #define THREAD_NUM 256
 #define BLOCK_NUM 32
+#define BLOCK_SIZE 16
 
 bool initCUDA() {
   int count = 0;
@@ -299,6 +300,126 @@ bool calculateSumOfSquares() {
   calculateUsingSync(data);
 
   return true;
+}
+
+__global__ static void matMultCUDA(const float* a, size_t id_a, const float *b, size_t id_b, float *c, size_t id_c, int n) {
+  /*
+  const int tid = threadIdx.x;
+  const int bid = blockIdx.x;
+  const int idx = bid * blockDim.x + tid;
+  const int row = idx / n;
+  const int col = idx % n;
+  int i;
+
+  if(row < n && col < n) {
+    float t = 0;
+    for(i = 0; i < n; ++i) {
+      t += a[row*id_a+i] * b[i*id_b+col];
+    }
+    c[row*id_c+col] = t;
+  }
+  */
+
+  extern __shared__ float data[];
+  const int tid = threadIdx.x;
+  const int row = blockIdx.x;
+  int i, j;
+
+  for(i = tid; i < n; i += blockDim.x) {
+    data[i] = a[row * id_a + i];
+  }
+
+  __syncthreads();
+
+  for(j = tid; j < n; j += blockDim.x) {
+    float t = 0;
+    float y = 0;
+    for(i = 0; i < n; ++i) {
+      float r;
+      y -= data[i] * b[i*id_b+j];
+      r = t - y;
+      y = (r -t) +y;
+      t = r;
+    }
+    c[row*id_c+j] = t;
+  } 
+}
+
+__global__ static void matMultCUDAMultiBlocks(const float* a, size_t id_a, const float *b, size_t id_b, float *c, size_t id_c, int n) {
+  
+}
+
+clock_t matmultCUDA(const float *a, int id_a, const float *b, int id_b, float *c, int id_c, int n) {
+  float *ac, *bc, *cc;
+  clock_t start, end;
+  
+  start = clock();
+  // cudaMalloc((void**)&ac, sizeof(float) * n * n);
+  // cudaMalloc((void**)&bc, sizeof(float) * n * n);
+  // cudaMalloc((void**)&cc, sizeof(float) * n * n);
+
+  // cudaMemcpy2D 函式，它是用来复制二维数组，可以指定数组的 pitch(即id_a, id_b, id_c)
+  // cudaMemcpy2D(ac, sizeof(float) * n, a, sizeof(float) * id_a, sizeof(float) * n, n, cudaMemcpyHostToDevice);
+  // cudaMemcpy2D(bc, sizeof(float) * n, b, sizeof(float) * id_b, sizeof(float) * n, n, cudaMemcpyHostToDevice);
+
+  size_t pitch_a, pitch_b, pitch_c;
+  //  cudaMallocPitch 的函式，可以自动以最佳的倍数来配置内存。
+  cudaMallocPitch((void**)&ac, &pitch_a, sizeof(float) * n, n);
+  cudaMallocPitch((void**)&bc, &pitch_b, sizeof(float) * n, n);
+  cudaMallocPitch((void**)&cc, &pitch_c, sizeof(float) * n, n);
+
+  cudaMemcpy2D(ac, pitch_a, a, sizeof(float) * id_a, sizeof(float) * n, n, cudaMemcpyHostToDevice);
+  cudaMemcpy2D(bc, pitch_b, b, sizeof(float) * id_b, sizeof(float) * n, n, cudaMemcpyHostToDevice);
+
+  // int blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+  // matMultCUDA<<<blocks*n, THREAD_NUM>>>(ac, n, bc, n, cc, n, n);
+  // matMultCUDA<<<n, THREAD_NUM, sizeof(float)*n>>>(ac, n, bc, n, cc, n, n);
+  //matMultCUDA<<<n, THREAD_NUM, sizeof(float)*n>>>(ac, pitch_a / sizeof(float), bc, pitch_b / sizeof(float), cc, pitch_c / sizeof(float), n);
+
+  int bx = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  dim3 blocks(bx, bx);
+  dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
+  matMultCUDA<<<blocks, threads>>>(ac, pitch_a/sizeof(float), bc, pitch_b / sizeof(float), cc, pitch_c / sizeof(float), n );
+
+
+  //cudaMemcpy2D(c, sizeof(float) * id_c, cc, sizeof(float)*n, sizeof(float)*n, n, cudaMemcpyDeviceToHost);
+  cudaMemcpy2D(c, sizeof(float) * id_c, cc, pitch_c, sizeof(float)*n, n, cudaMemcpyDeviceToHost);
+
+  cudaFree(ac);
+  cudaFree(bc);
+  cudaFree(cc);
+  
+  end = clock();
+
+  return end - start;
+}
+
+bool calculateMatrixMultiply() {
+  // 产生矩阵
+  float *a, *b, *c, *d;
+  int n = 1000;
+
+  a = (float*)malloc(sizeof(float) * n * n);
+  b = (float*)malloc(sizeof(float) * n * n);
+  c = (float*)malloc(sizeof(float) * n * n);
+  d = (float*)malloc(sizeof(float) * n * n);
+
+  // 随机数产生器(种子值)
+  srand(0);
+
+  generateMatrix(a, n, n);
+  generateMatrix(b, n, n);
+
+  clock_t time = matmultCUDA(a, n, b, n, c, n, n);
+
+  multiplyOnCPU(a, n, b, n, d, n, n);
+  compareMatrixError(c, n, d, n, n);
+
+  double sec = (double)time/CLOCKS_PER_SEC;
+  printf("Time Cost: %.2f(%.2lf GFLOPS)\n", sec, 2.0*n*n*n/(sec*1E9));
+
+  return true;
+
 }
 
 

@@ -56,3 +56,53 @@ void generateNumbers(int *number, int size) {
     number[i] = rand() % 10;
   }
 }
+
+// 用 double 来储存暂时的计算结果，以提高精确度。
+void multiplyOnCPU(const float *a, int id_a, const float *b, int id_b, float *c, int id_c, int n) {
+  int i, j, k;
+
+  for(i = 0; i < n; ++i) {
+    for(j = 0; j < n; ++j) {
+      double t = 0;
+      for(k = 0; k < n; ++k) {
+        t += a[i * id_a + k] * b[k * id_b + j];
+      }
+      c[i*id_c+j] = t;
+    }
+  }
+}
+
+
+
+// 利用随机数把矩阵生成 0 - 1 的数
+// C语言中无法声明变动大小的二维矩阵，所有使用 i*id_a+j 的方式
+void generateMatrix(float *a, int id_a, int n) {
+  int i, j;
+
+  for(i = 0; i < n; ++i) {
+    for(j = 0; j < n; ++j) {
+      a[i*id_a+j] = (float)rand()/RAND_MAX + (float)rand()/(RAND_MAX * RAND_MAX);
+    }
+  }
+}
+
+// 式计算两个矩阵的最大相对误差和平均相对误差，并把结果印出来。
+void compareMatrixError(const float *a, int id_a, const float *b, int id_b, int n) {
+  float max_err = 0;
+  float average_err = 0;
+  int i, j;
+
+  for(i = 0; i < n; ++i) {
+    for(j = 0; j < n; ++j) {
+      if(b[i*id_b+j] != 0) {
+        float err = fabs((a[i*id_a+j] - b[i*id_b+j])/b[i*id_b+j]);
+        if(max_err < err) {
+          max_err = err;
+        }
+        average_err += err;
+      }
+    }
+  }
+
+  printf("Max error: %g Average error: %g\n", max_err, average_err/(n*n));
+}

@@ -18,5 +18,10 @@ int main() {
     return 0;
   } 
 
+  if (!calculateMatrixMultiply()) {
+    printf("calculate matrix multiply fail.\n");
+    return 0;
+  } 
+
   return 0;
 }
