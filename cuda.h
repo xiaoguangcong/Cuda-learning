@@ -9,3 +9,5 @@
 bool initCUDA();
 
 bool calculateSumOfSquares();
+
+

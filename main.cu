@@ -16,9 +16,7 @@ int main() {
   if (!calculateSumOfSquares()) {
     printf("calculate sum of squares fail.\n");
     return 0;
-  } else {
-    printf("calculate sum of squares success.\n\n");
-  }
+  } 
 
   return 0;
 }

@@ -16,7 +16,6 @@ set(CUDA_NVCC_FLAGS "-arch=compute_75; -code=sm_75; -rdc=true; -lcudadevrt; -std
 
 # 生成静态库cudas
 add_library(libcuda STATIC
-  cuda_util.cu
   cuda.cu
   cuda.h
   )
